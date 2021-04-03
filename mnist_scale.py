@@ -11,7 +11,8 @@ def rescale_batch_images(paths, directory_path):
         old_size_initial = old_im.size
         unform_constant = np.random.uniform(0.3,1)
 
-        old_im = old_im.resize((int(old_size_initial[0] * unform_constant), int(old_size_initial[0] * unform_constant)), Image.ANTIALIAS)
+        old_im = old_im.resize((int(old_size_initial[0] * unform_constant), int(old_size_initial[0] * unform_constant)), Image.BILINEAR) 
+        # PIL.Image.ANTIALIAS
         old_size = old_im.size
 
         new_size = old_size_initial
