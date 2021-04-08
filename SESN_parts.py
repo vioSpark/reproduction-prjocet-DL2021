@@ -29,7 +29,6 @@ class convTH:
         self.S = S
         self.Nb = Nb
         # bases have the shape [Nb, S, V, V]
-        # TODO: hermite bases
         self.bases = hermite_bases(Nb, S, V)
 
         # weights
@@ -37,12 +36,15 @@ class convTH:
         # Nb is the number of steerable functions we represent a filter with
         # To say a metaphor, the bigger Nb, the more terms we've fetched in a Taylor approximation ..
         #       if this is chinese, ask Mark about it
-        self.weights = torch.Tensor(self.Cout, self.Cin, Nb)
+        self.weights = torch.Tensor(self.Cout, self.Cin, Nb).double()
+        self.weights.requires_grad = True
 
         # biases
         # TODO: where to add bias? after the regular conv into every channel (Cout and S separately)?
+        #  -- Mark's tip: at the conv2d line
         # shapes of bias:
         self.biases = torch.Tensor()
+        self.biases.requires_grad = True
 
         self.init_params()
 
@@ -67,7 +69,7 @@ class convTH:
 
         This translates to:
 
-        :param: x: input tensor which has a shape of [Cin, U, U] (channel-in, height, width)
+        :param: x: input tensor which has a shape of [N,Cin, U, U] (batch-size, channel-in, height, width)
 
         Returns:
             y: output tensor which has a shape of H - (Cout, S, U, U) where
@@ -78,7 +80,7 @@ class convTH:
         """
 
         # Extract dimensions
-        _, U, _ = x.shape()
+        N, C_in, U, _ = x.shape
 
         # TODO: autograd
         # TODO: add batch size
@@ -88,29 +90,37 @@ class convTH:
         # w:        [Cout, Cin, Nb]
         # filter:   [Cout, Cin, S, V, V ]
         # TODO: check if torch.matmul is the function for our case (see annotated figure 1)
-        filters = torch.matmul(self.weights, self.bases)
+        # TODO: cross-check this ein-sum
+        filters = torch.einsum('ijk, klmn -> ijlmn', self.weights, self.bases)
         # filters should be [Cout, Cin, S, V, V]
-        print(filters.shape)
+        check = (filters.shape == (self.Cout, self.Cin, self.S, self.V, self.V))
+        print(check)
 
         # expand
-        expanded_filters = filters.view(self.Cout, self.Cin * self.S, self.V, self.V)
-        # expanded_filters should be [Cout, Cin*S, V, V]
-        print(expanded_filters.shape)
+        # TODO: notify the authors that the paper might have a pretty significant 'bug' (I'm 95% sure):
+        # "...expand it to shape[Cout, CinS, V, V]. Then we use standard..." here it should be [CoutS, Cin, V, V]
+        expanded_filters = filters.view(self.Cout * self.S, self.Cin, self.V, self.V)
+        # expanded_filters should be [Cout, Cin*S, V, V] -> wrong, see above
+        check = (expanded_filters.shape == (self.Cout * self.S, self.Cin, self.V, self.V))
+        print(check)
 
         # convolve
         # TODO: bias?
-        # todo: stride, padding, ... ?
+        # todo: stride, padding, ... ? -- atm temporary fixed for retaining image shape w padding
         # TODO: is this the same as https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html ?
-        conv_output = torch.conv2d(x, expanded_filters)
-        # conv_output should be shaped [Cout, S, U, U] ... except when striding/padding is not normal
-        print(conv_output.shape)
+        conv_output = torch.conv2d(x, expanded_filters, padding=math.floor(self.V / 2))
+        # conv_output should be shaped [Cout * S, U, U] ... except when striding/padding is not normal
+        # plus batch-size -> [N, Cout * S, U, U]
+        check = (conv_output.shape == (N, self.Cout * self.S, U, U))
+        print(check)
 
         # squeeze
         # todo: stride, padding, ... - fix at U
         # todo: calculate U at runtime
-        y = conv_output.view(self.Cout, self.S, U, U)
+        y = conv_output.view(N, self.Cout, self.S, U, U)
         # y should be [Cout, S, U, U] ... expect when striding/padding...
-        print(y.shape)
+        check = (y.shape == (N, self.Cout, self.S, U, U))
+        print(check)
 
         return y
 
@@ -160,7 +170,7 @@ def hermite_bases(Nb, S, V, A=1, sigma=5):
         -   see this pic: https://www.researchgate.net/publication/308494563/figure/fig1/AS:560765801566208@1510708393139/Two-dimensional-Hermite-TDH-functions-of-rank-0-to-7-in-A-polar-form-and-B.png
         -   what on earth should A be?
     """
-    bases = torch.Tensor(Nb, S, V, V)
+    bases = torch.Tensor(Nb, S, V, V).double()
     # determine n-m from Nb
     # TODO: optimize this for loop
     config_list = generate_hermite_list(Nb)
@@ -171,10 +181,9 @@ def hermite_bases(Nb, S, V, A=1, sigma=5):
         for s in range(S):
             # sigma_inner runs from sigma ** 1 -> sigma ** (1/S)
             # TODO: double check if sigma_inner is conceptually right
-            sigma_inner = sigma ** ((s + 1)**-1)
-            print(sigma_inner)
-            x = np.linspace(int(math.ceil(-V / 2)), int(math.floor(V / 2)), V)
-            y = np.linspace(int(math.ceil(-V / 2)), int(math.floor(V / 2)), V)
+            sigma_inner = sigma ** ((s + 1) ** -1)
+            x = np.linspace(int(math.ceil(-V / 2)), int(math.floor(V / 2)), V, dtype=np.double)
+            y = np.linspace(int(math.ceil(-V / 2)), int(math.floor(V / 2)), V, dtype=np.double)
             p1 = A / (sigma_inner ** 2)
             # note: using "physicist's Hermite polynomials" by using scipy
             h1 = eval_hermite(n, x / sigma_inner)
