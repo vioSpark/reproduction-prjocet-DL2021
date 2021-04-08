@@ -50,8 +50,10 @@ class convTH:
 
     def init_params(self, std=0.7071):
         self.weights = std * torch.randn_like(self.weights)
+        self.weights.requires_grad = True
         # TODO: std for biases?
         self.biases = torch.rand_like(self.biases)
+        self.biases.requires_grad = True
 
     def forward(self, x):
         """

@@ -16,6 +16,13 @@ def dummy_image():
 
 cth = convTH(3, 2, 7, 5, 6)
 dummy_pic = dummy_image()
-cth.forward(dummy_pic)
+layer2 = cth.forward(dummy_pic)
+print('requires grad:', cth.weights.requires_grad)
+
+external_grad = torch.rand_like(layer2)
+layer2.backward(gradient=external_grad)
+grads = cth.weights.grad
+print(grads.shape)
+print(grads)
 
 # TODO: move py files to src
