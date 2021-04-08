@@ -1,7 +1,7 @@
 import torch
 import math
 import numpy as np
-from scipy.special import hermite
+from scipy.special import eval_hermite
 
 """
     Equation 7
@@ -28,9 +28,9 @@ class convTH:
         self.V = V
         self.S = S
         self.Nb = Nb
-        # bases have the shape [Nb, S, bases_size, bases_size]
+        # bases have the shape [Nb, S, V, V]
         # TODO: hermite bases
-        self.bases = hermite_bases()
+        self.bases = hermite_bases(Nb, S, V)
 
         # weights
         # w is an array of shape [Cout, Cin, Nb]
@@ -140,17 +140,49 @@ class convHH:
     pass
 
 
-def hermite_bases(x, n, y, m, A, sigma):
+def hermite_bases(Nb, S, V, A=1, sigma=.5):
     """
+    :param: Nb: number of bases ... pay attention to the pyramid form (image below)
+            to get a complete layer of the pyramid, you need Nb=n(n+1)/2 where n is an element of N
+    :param: S: number of how many scales we will have
+    :param: V: x*y size of each base
+    :param: A: global scale factor for filter
+    :param: sigma: The sigma that's on the power of S .. sigma is the biggest scale
     basis
         -   2D Hermite polynomials with 2D Gaussian envelope,
         -   The basis is pre-calculated for all scales and fixed.
         -   For filters of size V × V , the basis is stored as an array of shape of [Nb, S, V, V ]
             -   Appendix C for more details
+
+        -   sigma seems to be the scale parameter -> corresponds to S
+        -   Nb seems to be the polynomial order -> n and m parameters?
+        -   see this pic: https://www.researchgate.net/publication/308494563/figure/fig1/AS:560765801566208@1510708393139/Two-dimensional-Hermite-TDH-functions-of-rank-0-to-7-in-A-polar-form-and-B.png
+        -   what on earth should A be?
     """
-    p1 = A / (sigma ** 2)
-    h1 = hermite(n, x / sigma)
-    h2 = hermite(m, y / sigma)
-    gaussian_envelope = math.exp(-((x ** 2 + y ** 2) / (2 * sigma ** 2)))
-    psi = p1 * h1 * h2 * gaussian_envelope
+
+    # determine n-m from Nb
+    # TODO: optimize this for loop
+    # TODO: check if in our case it's a complete basis too, or nah?
+    for n in range(Nb):
+        for m in range(Nb):
+            # TODO: check if array size surpassed Nb
+            # TODO: check if it's okay to run sigma like this
+            for s in range(S):
+                # sigma_inner runs from sigma ** 1 -> sigma ** (1/S)
+                # TODO: double check sigma_inner
+                sigma_inner = sigma ** ((s + 1) ** -1)
+                x = np.linspace(int(math.ceil(-V / 2)), int(math.floor(V / 2)), V)
+                y = np.linspace(int(math.ceil(-V / 2)), int(math.floor(V / 2)), V)
+                # TODO: construct the polynomials
+
+                p1 = A / (sigma ** 2)
+                # note: using "physicist's Hermite polynomials" by using scipy
+                dummy = eval_hermite(n, x)
+                print(dummy)
+                # TODO: Mark is here.... eval_hermite looks like the function I need..
+                h1 = eval_hermite(n, x / sigma)
+                h2 = eval_hermite(m, y / sigma)
+                gaussian_envelope = math.exp(-((x ** 2 + y ** 2) / (2 * sigma ** 2)))
+                psi = p1 * h1 * h2 * gaussian_envelope
+
     return psi
