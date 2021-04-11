@@ -20,8 +20,9 @@ def rescale_batch_images(paths, directory_path):
         new_im.paste(old_im, ((new_size[0]-old_size[0])//2,
                             (new_size[1]-old_size[1])//2))
 
-        rescaled_image_filename = image.split("/").pop()
-        # print(rescaled_image_filename)
+        rescaled_image_filename = image.split("/")[1]
+        rescaled_image_filename = str(rescaled_image_filename.split(".")[0] + ".png") #lossless format
+
         new_im.save(directory_path + "/" + rescaled_image_filename)
 
 def get_images_path(directory_path):
