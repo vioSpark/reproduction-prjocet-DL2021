@@ -1,26 +1,28 @@
 import yaml
 import statistics
 
+
 def open_results_file(filename):
     with open(filename, 'r') as stream:
         try:
-            #print(yaml.safe_load(stream))
+            # print(yaml.safe_load(stream))
             data = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
             print(exc)
     return data
 
+
 FILENAME = "results.yml"
 
 if __name__ == "__main__":
     results = open_results_file(FILENAME)
-    
+
     models = []
 
     for res in results:
         models.append(res['model'])
 
-    #remove duplicates
+    # remove duplicates
     models = list(dict.fromkeys(models))
 
     models_acc = dict.fromkeys(models)
@@ -29,17 +31,19 @@ if __name__ == "__main__":
         acc = []
         for res in results:
             if res['model'] == model:
-                acc.append((1-res['acc'])*100)
+                acc.append((1 - res['acc']) * 100)
         # print(len(acc))
         # print(model)
         # print(acc)
         print(f"Erorrs for: {model}: \n {acc}")
         # print(f"max: {max(acc)}")
         # print(f"min: {min(acc)}")
-        # print(statistics.stdev(acc))
-        models_acc[model] = sum(acc)/len(acc)
+        std = statistics.stdev(acc)
+        # print(std)
+        avg = sum(acc) / len(acc)
+        models_acc[model] = (avg, std)
         print()
-    
+
     print("Average error for SCALAR SESN")
     for k, val in models_acc.items():
         if 'scalar' in k:
@@ -50,8 +54,6 @@ if __name__ == "__main__":
     for k, val in models_acc.items():
         if 'vector' in k:
             print(k, val)
-
-
 
 ### OUTPUT ###
 # Erorrs for: mnist_ses_scalar_28: 
