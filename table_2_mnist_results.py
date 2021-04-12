@@ -32,7 +32,7 @@ if __name__ == "__main__":
         for res in results:
             if res['model'] == model:
                 acc.append((1 - res['acc']) * 100)
-        # print(len(acc))
+        print(len(acc))
         # print(model)
         # print(acc)
         print(f"Erorrs for: {model}: \n {acc}")
